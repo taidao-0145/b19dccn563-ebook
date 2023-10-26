@@ -1,0 +1,65 @@
+version: "3.9"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: ./containers/app/Dockerfile
+      args:
+        - APP_ENV=local
+        - PHP_INI_PATH=./containers/app/php.ini-local
+    volumes:
+      - type: bind
+        source: ./backend
+        target: /var/www
+    environment:
+      - DB_HOST=db
+      - DB_DATABASE=${DB_NAME:-laravel_local}
+      - DB_USERNAME=${DB_USER:-phper}
+      - DB_PASSWORD=${DB_PASS:-secret}
+    networks:
+      - internal-ebook-db
+  
+  web:
+    build:
+      context: .
+      dockerfile: ./containers/web/Dockerfile
+      args:
+        - APP_HOST=app
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "80:80"
+    volumes:
+      - ./backend/public:/var/www/public
+    links:
+      - app
+    networks:
+      - external-ebook-api
+      - internal-ebook-db
+      - internal-ebook-app
+
+  db:
+    build:
+      context: .
+      dockerfile: ./containers/db/Dockerfile
+    ports:
+      - target: 3306
+        published: ${DB_PORT:-3306}
+        protocol: tcp
+        mode: host
+    volumes:
+      - ./containers/db_data:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=${DB_NAME:-laravel_local}
+      - MYSQL_USER=${DB_USER:-phper}
+      - MYSQL_PASSWORD=${DB_PASS:-secret}
+      - MYSQL_ROOT_PASSWORD=${DB_PASS:-secret}
+    networks:
+      - internal-ebook-db
+      - external-ebook-api
+
+networks:
+  external-ebook-api:
+    driver: bridge
+  internal-ebook-db:
+  internal-ebook-app:
